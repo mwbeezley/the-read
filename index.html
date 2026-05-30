@@ -3684,7 +3684,15 @@ ${patternCtx}
 
 CRITICAL INSTRUCTIONS:
 1. YOUR TRAINING DATA IS OUTDATED. Players get traded, released, injured, and retire constantly. You MUST web_search for CURRENT rosters, lineups, and depth charts before suggesting ANY player props. Never assume a player is still on a team based on memory — verify first.
-2. Search for: current team rosters/lineups, today's starting lineup or probable starters, injury reports, recent stats (last 5-10 games), matchup data, and line movement. Make multiple searches.
+2. Search for current data using these AUTHORITATIVE SOURCES by sport — go directly to these rather than broad searches:
+
+NFL/CFB: ESPN, pro-football-reference.com, pff.com, footballoutsiders.com, teamrankings.com
+NHL: ESPN, hockey-reference.com, naturalstattrick.com, moneypuck.com, dailyfaceoff.com (confirmed lines/goalies)
+MLB: ESPN, baseball-reference.com, fangraphs.com, baseballsavant.mlb.com (Statcast), rotowire.com (lineups)
+Soccer/UCL/EPL/La Liga: fbref.com, sofascore.com, whoscored.com, understat.com (xG), UEFA.com, ESPN
+Golf/PGA: pgatour.com, datagolf.com (strokes gained + course fit), ESPN
+
+Make 4-6 targeted fetches maximum, prioritizing: (1) confirmed starting lineups/goalies/injuries from the most recent source, (2) recent form and advanced metrics (xG, Corsi, strokes gained), (3) head-to-head and matchup data, (4) current odds and line movement. Prioritize sources updated within the last 48 hours for lineup/injury news. Quality and recency over volume.
 3. Be SPECIFIC with real stats, real players, real numbers from your research. Never fabricate stats. If you can't verify a player is on the current roster, do NOT include them in prop suggestions.
 4. Think like a sharp bettor: correlation between legs matters, game script drives everything, and public money creates value on the other side.
 5. Your SGP recommendations must have legs that tell a coherent story — they should be correlated through game script, not random independent events.
@@ -3810,7 +3818,7 @@ Search for: current team stats and rankings, injury reports for both teams, rece
       headers: claudeHeaders(),
       signal: controller.signal,
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-opus-4-20250514',
         max_tokens: 4000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
