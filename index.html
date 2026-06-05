@@ -3430,7 +3430,10 @@ Be precise. Extract exact odds if visible. Identify each leg's hit/miss status f
             <div class="parsed-leg-desc">${l.hit===true?'✅':l.hit===false?'❌':'⬜'} ${l.desc}</div>
             <div style="font-family:'Source Code Pro',monospace;font-size:9px;color:var(--text3);margin-top:2px">${l.type?.replace(/-/g,' ')||''}${l.playerName?' · '+l.playerName:''}</div>
           </div>
-          <div class="parsed-leg-odds" style="color:${(l.odds||0)>0?'var(--dk)':'var(--text2)'}">${fmtOdds(l.odds||0)}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <div class="parsed-leg-odds" style="color:${(l.odds||0)>0?'var(--dk)':'var(--text2)'}">${fmtOdds(l.odds||0)}</div>
+            ${(isFinite(Number(l.odds))&&Math.abs(Number(l.odds))>=100)?`<button class="btn btn-gold btn-sm" onclick="sendLegToEdge(${i})" title="Send this price to the Edge calculator as your book's price (soft side)" style="font-size:9px;padding:4px 8px">→ Edge</button>`:''}
+          </div>
         </div>`).join('')}`;
 
     // Store matchup context for import
@@ -3462,6 +3465,20 @@ function importParsedToBuilder() {
   if(meta.boostPct) $('boost-pct').value = meta.boostPct;
   renderLegs(); recalc(); switchTab('builder');
   showToast(`✅ ${legs.length} legs imported from screenshot`);
+}
+
+// Hand a parsed slip leg's price into the Edge calculator as the "your book's price" (soft) side.
+// Pairs with the Kalshi vig-free reference (fair side) — screenshot fills soft, Kalshi fills fair.
+function sendLegToEdge(i){
+  const l = parsedUploadLegs[i]; if(!l) return;
+  const odds = Number(l.odds);
+  if(!isFinite(odds) || odds===0 || Math.abs(odds)<100){ showToast('That leg has no usable American price','var(--gold)'); return; }
+  $('edge-soft').value = odds;
+  const pname = l.playerName || '', desc = l.desc || l.statType || 'prop';
+  $('edge-mkt-label').value = ((pname && !desc.includes(pname)) ? pname+' — '+desc : desc).slice(0,60);
+  switchTab('edge');
+  const k = $('edge-kalshi-q'); if(k) k.scrollIntoView({behavior:'smooth',block:'center'});
+  showToast('✅ Slip price → Edge (your book). Now set the fair side via Kalshi.','var(--neon)');
 }
 
 function saveParsedToPending() {
