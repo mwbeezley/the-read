@@ -1561,10 +1561,9 @@ const saveClaudeKey = () => { localStorage.setItem('sgplab-claude-key', $('claud
 function getClaudeKey() { return $('claude-api-key')?.value?.trim() || localStorage.getItem('sgplab-claude-key') || ''; }
 function updateClaudeStatus() { const s=$('claude-api-status'); if(s) s.className='api-status '+(getClaudeKey()?'ok':''); }
 function claudeHeaders() {
-  const h = { 'Content-Type': 'application/json' };
-  const key = getClaudeKey();
-  if(key) { h['x-api-key'] = key; h['anthropic-version'] = '2023-06-01'; h['anthropic-dangerous-direct-browser-access'] = 'true'; }
-  return h;
+  // x-api-key / anthropic-version / anthropic-dangerous-direct-browser-access are now set
+  // server-side by the /api/claude Netlify proxy. The browser only sends Content-Type.
+  return { 'Content-Type': 'application/json' };
 }
 
 function showToast(msg, color='var(--neon2)') {
@@ -1576,7 +1575,7 @@ function showToast(msg, color='var(--neon2)') {
 }
 
 function callClaude(prompt, maxTokens=900) {
-  return fetch('https://api.anthropic.com/v1/messages', {
+  return fetch('/api/claude', {
     method:'POST',
     headers:claudeHeaders(),
     body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:maxTokens, messages:[{role:'user',content:prompt}] })
@@ -1920,7 +1919,7 @@ async function runAnalysis() {
   const ip=(legs.reduce((a,l)=>a*impliedProb(l.odds),1)*100).toFixed(1);
   const patternCtx=buildPatternContext();
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -1976,7 +1975,7 @@ async function autoGenerate() {
   const patternCtx=buildPatternContext();
   const btn=$('gen-btn'); btn.disabled=true; btn.innerHTML='⏳ Building...';
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -2672,7 +2671,7 @@ async function multiAutoSGP() {
   showToast(`Building ${games.length}-game parlay...`);
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method:'POST', headers:claudeHeaders(),
       body: JSON.stringify({
         model:'claude-sonnet-4-20250514', max_tokens:2000,
@@ -2915,7 +2914,7 @@ async function fetchDashPrevWeek() {
   $('dash-prev-results').innerHTML = '<div class="schedule-loading">Fetching last week\'s results...</div>';
   const btn = $('dash-prev-btn'); btn.disabled=true;
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method: 'POST',
       headers: claudeHeaders(),
       body: JSON.stringify({
@@ -3003,7 +3002,7 @@ async function parseScreenshot(base64, mediaType) {
   $('parsed-legs').style.display = 'block';
   $('parsed-legs').innerHTML = loadingBars();
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method: 'POST',
       headers: claudeHeaders(),
       body: JSON.stringify({
@@ -3144,7 +3143,7 @@ async function suggestAlternative() {
   const sportCtx = getSportContext(sportKey);
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method: 'POST',
       headers: claudeHeaders(),
       body: JSON.stringify({
@@ -3813,7 +3812,7 @@ Search for: current team stats and rankings, injury reports for both teams, rece
     const timeout = setTimeout(() => controller.abort(), 150000);
     btn.innerHTML = '🔍 Searching...';
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method: 'POST',
       headers: claudeHeaders(),
       signal: controller.signal,
@@ -4061,7 +4060,7 @@ async function runScoutQuestion() {
   const sport = $('scout-sport').options[$('scout-sport').selectedIndex].text;
   $('scout-ask-result').innerHTML = '<div style="color:var(--text3);font-size:11px">🧠 Researching...</div>';
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method: 'POST',
       headers: claudeHeaders(),
       body: JSON.stringify({
