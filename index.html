@@ -648,6 +648,25 @@ textarea{resize:vertical;min-height:60px;line-height:1.6}
     </div>
   </div>
 
+  <!-- Edge Quick-Look -->
+  <div class="dash-section">
+    <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--gold);border-radius:8px;padding:16px 18px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gold);flex-shrink:0" aria-hidden="true"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>
+        <div style="font-family:'Manrope',sans-serif;font-size:14px;font-weight:700;color:var(--text)">Edge</div>
+        <div style="font-size:11px;color:var(--text3)">Quick devig read</div>
+        <button class="btn btn-ghost btn-sm" onclick="openEdgeFromWidget()" style="margin-left:auto;font-size:10px;color:var(--accent1)" title="Open the full Edge calculator with these values carried over">Open in Edge →</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:80px"><label>Ref A (your bet)</label><input id="dash-edge-a" inputmode="numeric" placeholder="-110" autocomplete="off" /></div>
+        <div class="field" style="flex:1;min-width:80px"><label>Ref B</label><input id="dash-edge-b" inputmode="numeric" placeholder="-110" autocomplete="off" /></div>
+        <div class="field" style="flex:1;min-width:80px"><label>Your Price</label><input id="dash-edge-soft" inputmode="numeric" placeholder="+100" autocomplete="off" /></div>
+        <button class="btn btn-primary btn-sm" onclick="runDashEdge()" style="min-width:72px;padding:9px 14px">Read it</button>
+      </div>
+      <div id="dash-edge-result" style="display:none;margin-top:12px"></div>
+    </div>
+  </div>
+
   <!-- My Teams -->
   <div class="dash-section" style="margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -1210,7 +1229,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.6}
   </div>
   <div class="field" style="margin-bottom:14px">
     <label>Market Label (optional)</label>
-    <input id="edge-label" placeholder="e.g. Lakers ML" autocomplete="off"/>
+    <input id="edge-mkt-label" placeholder="e.g. Lakers ML" autocomplete="off"/>
   </div>
 
   <button class="btn btn-primary" onclick="runEdge()" style="width:100%;justify-content:center;padding:11px">Calculate Edge</button>
@@ -1717,7 +1736,7 @@ const edgeSigned = (n,d=1) => (n>=0?'+':'') + n.toFixed(d);
 
 function runEdge(){
   const aRaw=$('edge-ref-a').value.trim(), bRaw=$('edge-ref-b').value.trim(), softRaw=$('edge-soft').value.trim();
-  const label=$('edge-label').value.trim();
+  const label=$('edge-mkt-label').value.trim();
   const method=$('edge-method').value;
   if(aRaw===''||bRaw===''||softRaw===''){ showToast('Enter both reference sides and your price','var(--gold)'); return; }
   const a=Number(aRaw), b=Number(bRaw), soft=Number(softRaw);
@@ -1764,6 +1783,39 @@ function runEdge(){
       Market hold ${d.holdPct.toFixed(2)}% &middot; Fair ${(fairProb*100).toFixed(1)}% vs implied ${(americanToProb(soft)*100).toFixed(1)}% &middot; EV ${evDollar>=0?'+':'−'}$${Math.abs(evDollar).toFixed(2)} on $${stake.toFixed(0)} stake &middot; ${EDGE_METHOD_NAMES[method]} de-vig
     </div>`;
   $('edge-result').style.display = 'block';
+}
+
+// ── Dashboard quick-look widget ── reuses the SAME global edgeDevig/EV math (no duplication).
+// Lightweight: verdict band + fair line + EV% only. Full readout / method / stake live in the Edge tab.
+function runDashEdge(){
+  const aRaw=$('dash-edge-a').value.trim(), bRaw=$('dash-edge-b').value.trim(), softRaw=$('dash-edge-soft').value.trim();
+  if(aRaw===''||bRaw===''||softRaw===''){ showToast('Enter both reference sides and your price','var(--gold)'); return; }
+  const a=Number(aRaw), b=Number(bRaw), soft=Number(softRaw);
+  if(![a,b,soft].every(n=>isFinite(n)&&n!==0&&Math.abs(n)>=100)){ showToast('American odds must be valid (e.g. -110 or +120)','var(--gold)'); return; }
+  const d = edgeDevig(a,b,'power');                 // shared global math (power method = Edge tab default)
+  const fa = d.fa;                                   // fa = the side you'd bet
+  const fairLine = probToAmerican(fa);
+  const evPct = (fa*profitPerDollar(soft) - (1-fa))*100;
+  const band = evPct>=2  ? { label:'Plus EV',  color:'var(--dk)',   bg:'rgba(0,168,67,.10)' }    // green
+             : evPct>-1  ? { label:'Marginal', color:'var(--gold)', bg:'rgba(212,160,23,.12)' }  // amber
+             :             { label:'Minus EV', color:'var(--red)',  bg:'rgba(214,64,69,.12)' };  // red (minus only)
+  const fairStr = fairLine===null ? '—' : (fairLine>=0?'+':'')+fairLine;
+  const evStr = (evPct>=0?'+':'')+evPct.toFixed(1)+'%';
+  $('dash-edge-result').innerHTML = `<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:${band.bg};border:1px solid ${band.color};border-radius:6px;padding:9px 13px">
+      <span style="display:inline-flex;align-items:center;gap:6px;font-family:'Manrope',sans-serif;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${band.color}"><span style="width:7px;height:7px;border-radius:50%;background:${band.color}"></span>${band.label}</span>
+      <span style="font-family:'Source Code Pro',monospace;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Fair <b style="font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;color:var(--text)">${fairStr}</b></span>
+      <span style="font-family:'Source Code Pro',monospace;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">EV <b style="font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;color:${band.color}">${evStr}</b></span>
+    </div>`;
+  $('dash-edge-result').style.display='block';
+}
+
+// Carry the widget's current values into the full Edge tab, switch to it, and (if complete) run the full read.
+function openEdgeFromWidget(){
+  $('edge-ref-a').value = $('dash-edge-a').value;
+  $('edge-ref-b').value = $('dash-edge-b').value;
+  $('edge-soft').value  = $('dash-edge-soft').value;
+  switchTab('edge');
+  if($('edge-ref-a').value.trim() && $('edge-ref-b').value.trim() && $('edge-soft').value.trim()) runEdge();
 }
 
 // ══════════════════════════════════════════
