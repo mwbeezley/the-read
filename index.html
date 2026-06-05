@@ -604,6 +604,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.6}
   <div class="tab active" onclick="switchTab('home')">Home</div>
   <div class="tab" onclick="switchTab('builder')">Builder</div>
   <div class="tab" onclick="switchTab('scout')">Scout</div>
+  <div class="tab" onclick="switchTab('edge')"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px" aria-hidden="true"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>Edge</div>
   <div class="tab" onclick="switchTab('upload')">Upload</div>
   <div class="tab" onclick="switchTab('pending')">Pending</div>
   <div class="tab" onclick="switchTab('placed')">Placed</div>
@@ -1170,6 +1171,54 @@ textarea{resize:vertical;min-height:60px;line-height:1.6}
 </div>
 
 <!-- ══════════════════════════════════════════
+     EDGE TAB — Devig + Edge Calculator (pure client-side math)
+═══════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-edge" style="padding:24px;max-width:760px;margin:0 auto">
+  <div style="font-family:'Manrope',sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;color:var(--text)">Edge Calculator</div>
+  <p style="font-size:12px;color:var(--text3);margin-bottom:18px;line-height:1.6">Strip the vig from a sharp two-sided reference line and see how your book's price compares. Everything is computed in your browser — nothing leaves the page.</p>
+
+  <div class="section-title">Reference Line</div>
+  <div class="grid-2">
+    <div class="field">
+      <label>Ref Odds — Side A (your bet)</label>
+      <input id="edge-ref-a" inputmode="numeric" placeholder="-110" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label>Ref Odds — Side B (other side)</label>
+      <input id="edge-ref-b" inputmode="numeric" placeholder="-110" autocomplete="off"/>
+    </div>
+  </div>
+
+  <div class="section-title">Your Bet</div>
+  <div class="grid-3">
+    <div class="field">
+      <label>Your Book's Price</label>
+      <input id="edge-soft" inputmode="numeric" placeholder="+100" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label>Stake ($)</label>
+      <input id="edge-stake" inputmode="decimal" value="100" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label>De-vig Method</label>
+      <select id="edge-method">
+        <option value="power">Power (default)</option>
+        <option value="multiplicative">Multiplicative</option>
+        <option value="additive">Additive</option>
+      </select>
+    </div>
+  </div>
+  <div class="field" style="margin-bottom:14px">
+    <label>Market Label (optional)</label>
+    <input id="edge-label" placeholder="e.g. Lakers ML" autocomplete="off"/>
+  </div>
+
+  <button class="btn btn-primary" onclick="runEdge()" style="width:100%;justify-content:center;padding:11px">Calculate Edge</button>
+
+  <div id="edge-result" style="display:none;margin-top:18px"></div>
+</div>
+
+<!-- ══════════════════════════════════════════
      UPLOAD TAB — Screenshot Parser & Alternative Suggestions
 ═══════════════════════════════════════════ -->
 <div class="tab-panel" id="panel-upload" style="padding:24px;max-width:900px">
@@ -1610,7 +1659,7 @@ function mdToHtml(text) {
 // ══════════════════════════════════════════
 //  TABS & MODALS
 // ══════════════════════════════════════════
-const TAB_MAP = {home:'panel-home',builder:'panel-builder',scout:'panel-scout',upload:'panel-upload',pending:'panel-pending',placed:'panel-placed',library:'panel-library',tools:'panel-tools',guide:'panel-guide'};
+const TAB_MAP = {home:'panel-home',builder:'panel-builder',scout:'panel-scout',edge:'panel-edge',upload:'panel-upload',pending:'panel-pending',placed:'panel-placed',library:'panel-library',tools:'panel-tools',guide:'panel-guide'};
 
 function switchTab(t) {
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',Object.keys(TAB_MAP)[i]===t));
@@ -1637,6 +1686,85 @@ function overlayClose(e,id) { if(e.target===$(id)) closeModal(id); }
 document.addEventListener('keydown', e => {
   if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
 });
+
+// ══════════════════════════════════════════
+//  EDGE CALCULATOR — in-browser devig + edge (pure math, no network)
+// ══════════════════════════════════════════
+// Verified math — do not rewrite.
+function americanToProb(o){o=Number(o);return o<0?(-o)/((-o)+100):100/(o+100);}
+function probToAmerican(p){if(p<=0||p>=1)return null;return p>0.5?Math.round(-(p/(1-p))*100):Math.round(((1-p)/p)*100);}
+function profitPerDollar(o){o=Number(o);return o>0?o/100:100/(-o);}
+function edgeDevig(a,b,method){
+  const ra=americanToProb(a), rb=americanToProb(b); let fa,fb;
+  if(method==='multiplicative'){const s=ra+rb;fa=ra/s;fb=rb/s;}
+  else if(method==='additive'){const o=(ra+rb-1)/2;fa=ra-o;fb=rb-o;}
+  else{let lo=0.0001,hi=10;for(let i=0;i<200;i++){const m=(lo+hi)/2;(Math.pow(ra,m)+Math.pow(rb,m)>1)?lo=m:hi=m;}const k=(lo+hi)/2;fa=Math.pow(ra,k);fb=Math.pow(rb,k);}
+  return {ra,rb,fa,fb,holdPct:(ra+rb-1)*100};
+}
+// Exposed globally so a future dashboard widget can reuse the same math.
+window.americanToProb = americanToProb;
+window.probToAmerican = probToAmerican;
+window.profitPerDollar = profitPerDollar;
+window.edgeDevig = edgeDevig;
+
+const EDGE_METHOD_NAMES = { power:'Power', multiplicative:'Multiplicative', additive:'Additive' };
+const EDGE_BANDS = {
+  plus:  { color:'var(--neon)', bg:'rgba(91,155,213,.12)', text:'Plus EV — bet' },       // powder / positive
+  marg:  { color:'var(--gold)', bg:'rgba(212,160,23,.12)', text:'Marginal — your call' }, // gold / neutral
+  minus: { color:'var(--red)',  bg:'rgba(214,64,69,.12)',  text:'Minus EV — pass' }       // red (minus only)
+};
+const edgeSigned = (n,d=1) => (n>=0?'+':'') + n.toFixed(d);
+
+function runEdge(){
+  const aRaw=$('edge-ref-a').value.trim(), bRaw=$('edge-ref-b').value.trim(), softRaw=$('edge-soft').value.trim();
+  const label=$('edge-label').value.trim();
+  const method=$('edge-method').value;
+  if(aRaw===''||bRaw===''||softRaw===''){ showToast('Enter both reference sides and your price','var(--gold)'); return; }
+  const a=Number(aRaw), b=Number(bRaw), soft=Number(softRaw);
+  if(![a,b,soft].every(n=>isFinite(n)&&n!==0&&Math.abs(n)>=100)){ showToast('American odds must be valid (e.g. -110 or +120)','var(--gold)'); return; }
+  const stakeRaw=parseFloat($('edge-stake').value);
+  const stake = isFinite(stakeRaw)&&stakeRaw>0 ? stakeRaw : 0;
+
+  const d = edgeDevig(a,b,method);
+  const fairProb = d.fa;                                   // fa = the side you'd bet
+  const fairLine = probToAmerican(fairProb);
+  const evPer1 = fairProb*profitPerDollar(soft) - (1-fairProb);
+  const evPct = evPer1*100;
+  const evDollar = evPer1*stake;
+  const edgePts = (fairProb - americanToProb(soft))*100;
+  const projCLV = edgePts;  // Proxy: projected CLV == edge pts for now. A true CLV forecast needs historical line-movement data.
+
+  // Verdict bands (order matters; red is reserved for the minus state only).
+  const band = evPct>=2 ? EDGE_BANDS.plus : (evPct>-1 ? EDGE_BANDS.marg : EDGE_BANDS.minus);
+
+  const fairStr = fairLine===null ? '—' : edgeSigned(fairLine,0);
+  const softStr = edgeSigned(soft,0);
+  const edgeWord = edgePts>=0 ? 'ahead of' : 'behind';
+  const evWord = evPct>=0 ? 'an expected return' : 'an expected loss';
+  const readout = `${label?label+' — ':''}At ${softStr}, your book sits ${edgeWord} the de-vigged fair line of ${fairStr} by ${Math.abs(edgePts).toFixed(1)} points, for ${evWord} of ${Math.abs(evPct).toFixed(1)}% per dollar staked.`;
+
+  const metric = (val,lab,color) => `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 8px;text-align:center">
+      <div style="font-family:'Manrope',sans-serif;font-size:28px;font-weight:800;line-height:1;color:${color||'var(--text)'}">${val}</div>
+      <div style="font-family:'Source Code Pro',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-top:7px">${lab}</div>
+    </div>`;
+
+  $('edge-result').innerHTML = `
+    <div style="display:inline-flex;align-items:center;gap:7px;font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 14px;border-radius:999px;background:${band.bg};border:1px solid ${band.color};color:${band.color};margin-bottom:14px">
+      <span style="width:7px;height:7px;border-radius:50%;background:${band.color}"></span>${band.text}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px">
+      ${metric(fairStr,'Fair Line')}
+      ${metric(edgeSigned(evPct)+'%','EV %',band.color)}
+      ${metric(edgeSigned(edgePts),'Edge (pts)')}
+      ${metric(edgeSigned(projCLV),'Proj CLV (pts)')}
+    </div>
+    <p style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:12px">${readout}</p>
+    <div class="divider-h"></div>
+    <div style="font-family:'Source Code Pro',monospace;font-size:10px;color:var(--text3);letter-spacing:.04em;line-height:1.7">
+      Market hold ${d.holdPct.toFixed(2)}% &middot; Fair ${(fairProb*100).toFixed(1)}% vs implied ${(americanToProb(soft)*100).toFixed(1)}% &middot; EV ${evDollar>=0?'+':'−'}$${Math.abs(evDollar).toFixed(2)} on $${stake.toFixed(0)} stake &middot; ${EDGE_METHOD_NAMES[method]} de-vig
+    </div>`;
+  $('edge-result').style.display = 'block';
+}
 
 // ══════════════════════════════════════════
 //  PLATFORM
