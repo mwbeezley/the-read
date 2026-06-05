@@ -1194,7 +1194,74 @@ textarea{resize:vertical;min-height:60px;line-height:1.6}
 ═══════════════════════════════════════════ -->
 <div class="tab-panel" id="panel-edge" style="padding:24px;max-width:760px;margin:0 auto">
   <div style="font-family:'Manrope',sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;color:var(--text)">Edge Calculator</div>
-  <p style="font-size:12px;color:var(--text3);margin-bottom:18px;line-height:1.6">Strip the vig from a sharp two-sided reference line and see how your book's price compares. Everything is computed in your browser — nothing leaves the page.</p>
+  <p style="font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.6">Strip the vig from a sharp two-sided reference line and see how your book's price compares. Pull a live game line or a Kalshi vig-free reference to auto-fill — or just type the odds in by hand. The edge math runs in your browser.</p>
+
+  <div class="section-title"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gold);flex-shrink:0" aria-hidden="true"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>Auto-fill from live data</div>
+
+  <!-- Game lines — The Odds API (server-side key, game lines only) -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px">
+    <div style="font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Game lines <span style="font-weight:400;color:var(--text3)">— moneyline / spread / total</span></div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:150px">
+        <label>Sport</label>
+        <select id="edge-odds-sport">
+          <option value="americanfootball_nfl">NFL</option>
+          <option value="americanfootball_ncaaf">NCAAF</option>
+          <option value="basketball_nba">NBA</option>
+          <option value="basketball_wnba">WNBA</option>
+          <option value="basketball_ncaab">NCAAB</option>
+          <option value="baseball_mlb">MLB</option>
+          <option value="icehockey_nhl">NHL</option>
+          <option value="soccer_epl">EPL</option>
+          <option value="soccer_uefa_champs_league">UCL</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="edgeLoadGames()" id="edge-odds-load" style="padding:9px 14px">Load games</button>
+    </div>
+    <div id="edge-odds-controls" style="display:none;margin-top:8px">
+      <div class="field" style="margin-bottom:8px">
+        <label>Game</label>
+        <select id="edge-odds-game" onchange="edgePopulateSides()"></select>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label>Market</label>
+          <select id="edge-odds-market" onchange="edgePopulateSides()">
+            <option value="h2h">Moneyline</option>
+            <option value="spreads">Spread</option>
+            <option value="totals">Total</option>
+          </select>
+        </div>
+        <div class="field"><label>Side (your bet)</label><select id="edge-odds-side"></select></div>
+        <div class="field">
+          <label>Your book</label>
+          <select id="edge-odds-book"><option value="draftkings">DraftKings</option><option value="fanduel">FanDuel</option></select>
+        </div>
+      </div>
+      <button class="btn btn-gold btn-sm" onclick="edgeFillFromGame()" style="width:100%;justify-content:center">Fill reference + your price ↓</button>
+    </div>
+    <div id="edge-odds-status" style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5"></div>
+  </div>
+
+  <!-- Player props — Kalshi (vig-free reference) -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px">
+    <div style="font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Player props <span style="font-weight:400;color:var(--text3)">— Kalshi vig-free reference</span></div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:180px">
+        <label>Kalshi series ticker</label>
+        <input id="edge-kalshi-q" placeholder="e.g. KXNBA… (series ticker)" autocomplete="off"/>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="edgeLoadKalshi()" id="edge-kalshi-load" style="padding:9px 14px">Load markets</button>
+    </div>
+    <div id="edge-kalshi-controls" style="display:none;margin-top:8px">
+      <div class="field" style="margin-bottom:8px"><label>Market</label><select id="edge-kalshi-market"></select></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:120px"><label>Bet side</label><select id="edge-kalshi-side"><option value="yes">YES / Over</option><option value="no">NO / Under</option></select></div>
+        <button class="btn btn-gold btn-sm" onclick="edgeFillFromKalshi()" style="padding:9px 14px">Fill reference (fair) ↓</button>
+      </div>
+    </div>
+    <div id="edge-kalshi-status" style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5">Kalshi binaries are vig-free, so the yes/no price is the fair probability. After filling, enter your book's prop price below by hand (the free Odds API tier has no props).</div>
+  </div>
 
   <div class="section-title">Reference Line</div>
   <div class="grid-2">
@@ -1816,6 +1883,128 @@ function openEdgeFromWidget(){
   $('edge-soft').value  = $('dash-edge-soft').value;
   switchTab('edge');
   if($('edge-ref-a').value.trim() && $('edge-ref-b').value.trim() && $('edge-soft').value.trim()) runEdge();
+}
+
+// ══════════════════════════════════════════
+//  EDGE — LIVE DATA AUTO-FILL
+//  Part A: The Odds API game lines (via /api/odds). Part B: Kalshi vig-free reference (via /api/kalshi).
+//  Manual entry stays the fallback for everything these don't cover.
+// ══════════════════════════════════════════
+let edgeOddsGames = [];
+let edgeKalshiMarkets = [];
+let edgeKalshiLogged = false;   // log Kalshi's raw response shape once, for inspection
+
+// ── Part A: Odds API game lines ──
+async function edgeLoadGames(){
+  const sport=$('edge-odds-sport').value, btn=$('edge-odds-load'), st=$('edge-odds-status');
+  btn.disabled=true; const orig=btn.textContent; btn.textContent='Loading…';
+  st.style.color='var(--text3)'; st.textContent='Fetching games…';
+  try{
+    const res=await fetch('/api/odds?sport='+encodeURIComponent(sport));
+    let data; try{ data=await res.json(); }catch(e){ throw new Error('Odds API returned a non-JSON response.'); }
+    if(!res.ok) throw new Error((data&&data.error)?data.error:('Odds API error '+res.status));
+    if(!Array.isArray(data)||!data.length){ edgeOddsGames=[]; $('edge-odds-controls').style.display='none'; st.style.color='var(--gold)'; st.textContent='No games returned for this sport right now.'; return; }
+    edgeOddsGames=data;
+    $('edge-odds-game').innerHTML=data.map((g,i)=>{ const d=new Date(g.commence_time); const ds=isNaN(d.getTime())?'':' · '+d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); return `<option value="${i}">${g.away_team} @ ${g.home_team}${ds}</option>`; }).join('');
+    $('edge-odds-controls').style.display='block';
+    edgePopulateSides();
+    st.style.color='var(--dk)'; st.textContent='✓ '+data.length+' games loaded.';
+  }catch(err){
+    edgeOddsGames=[]; $('edge-odds-controls').style.display='none';
+    st.style.color='var(--red)'; st.textContent='⚠ '+err.message;
+  }finally{ btn.disabled=false; btn.textContent=orig; }
+}
+
+function edgePopulateSides(){
+  const g=edgeOddsGames[+$('edge-odds-game').value]; if(!g) return;
+  const market=$('edge-odds-market').value, seen=new Map();
+  (g.bookmakers||[]).forEach(bk=>{ const mk=(bk.markets||[]).find(m=>m.key===market); if(mk)(mk.outcomes||[]).forEach(o=>{ if(!seen.has(o.name)) seen.set(o.name,o.point); }); });
+  const sel=$('edge-odds-side');
+  if(!seen.size){ sel.innerHTML='<option value="">(no '+market+' data)</option>'; return; }
+  sel.innerHTML=[...seen.entries()].map(([name,point])=>{ const lbl=(point!==undefined&&point!==null)?`${name} ${point>0?'+':''}${point}`:name; return `<option value="${name.replace(/"/g,'&quot;')}">${lbl}</option>`; }).join('');
+}
+
+function edgeFillFromGame(){
+  const g=edgeOddsGames[+$('edge-odds-game').value], st=$('edge-odds-status'); if(!g) return;
+  const market=$('edge-odds-market').value, side=$('edge-odds-side').value, book=$('edge-odds-book').value;
+  if(!side){ st.style.color='var(--red)'; st.textContent='Pick a side first.'; return; }
+  const outcomeFor=(bk,name)=>{ const mk=(bk.markets||[]).find(m=>m.key===market); return mk?(mk.outcomes||[]).find(o=>o.name===name):null; };
+  const chosenBk=(g.bookmakers||[]).find(b=>b.key===book);
+  // point of the chosen side (from your book; fall back to any book)
+  let pt = chosenBk ? (outcomeFor(chosenBk,side)||{}).point : undefined;
+  if(pt===undefined){ for(const bk of (g.bookmakers||[])){ const o=outcomeFor(bk,side); if(o){ pt=o.point; break; } } }
+  // other side name
+  const names=new Set(); (g.bookmakers||[]).forEach(bk=>{ const mk=(bk.markets||[]).find(m=>m.key===market); if(mk)(mk.outcomes||[]).forEach(o=>names.add(o.name)); });
+  const otherSide=[...names].find(n=>n!==side);
+  // consensus = average implied prob across books (matching point for spreads/totals) -> American
+  const consensus=(name)=>{ const ps=[]; (g.bookmakers||[]).forEach(bk=>{ const o=outcomeFor(bk,name); if(o&&isFinite(o.price)&&(pt===undefined||pt===null||o.point===pt)) ps.push(americanToProb(o.price)); }); if(!ps.length) return null; return probToAmerican(ps.reduce((s,p)=>s+p,0)/ps.length); };
+  const refA=consensus(side), refB=otherSide?consensus(otherSide):null;
+  let soft = chosenBk ? (outcomeFor(chosenBk,side)||{}).price : undefined;
+  if(soft===undefined){ for(const bk of (g.bookmakers||[])){ const o=outcomeFor(bk,side); if(o){ soft=o.price; break; } } }
+  if(refA==null||refB==null||soft===undefined){ st.style.color='var(--red)'; st.textContent='Could not assemble a two-sided line for that selection.'; return; }
+  $('edge-ref-a').value=refA; $('edge-ref-b').value=refB; $('edge-soft').value=soft;
+  const ptLabel=(pt!==undefined&&pt!==null)?` ${pt>0?'+':''}${pt}`:'';
+  const mlabel=market==='h2h'?'ML':market==='spreads'?'spread':'total';
+  $('edge-mkt-label').value=`${g.away_team} @ ${g.home_team} — ${side}${ptLabel} (${mlabel})`;
+  st.style.color='var(--dk)'; st.textContent=`✓ Ref ${edgeSigned(refA,0)}/${edgeSigned(refB,0)} (consensus of available books) · your ${book==='draftkings'?'DK':'FD'} price ${edgeSigned(soft,0)}.`;
+  runEdge();
+}
+
+// ── Part B: Kalshi vig-free reference ──
+const clamp01 = x => Math.max(0.0001, Math.min(0.9999, x));
+// Read a YES probability (0-1) from a Kalshi market, defensively across known field shapes.
+function kalshiYesProb(m){
+  if(!m||typeof m!=='object') return null;
+  const num=v=>(v===null||v===undefined||v==='')?null:(isFinite(Number(v))?Number(v):null);
+  const mid=(b,a)=>{ b=num(b); a=num(a); if(b!=null&&a!=null) return (b+a)/2; return b!=null?b:(a!=null?a:null); };
+  // dollar-denominated fields (0-1)
+  let p=mid(m.yes_bid_dollars,m.yes_ask_dollars);
+  if(p==null) p=num(m.last_price_dollars);
+  if(p==null){ const nd=mid(m.no_bid_dollars,m.no_ask_dollars); if(nd!=null) p=1-nd; }
+  if(p!=null) return clamp01(p);
+  // cent-denominated fields (0-100)
+  let c=mid(m.yes_bid,m.yes_ask);
+  if(c==null) c=num(m.last_price);
+  if(c==null){ const nc=mid(m.no_bid,m.no_ask); if(nc!=null) c=100-nc; }
+  if(c!=null) return clamp01(c/100);
+  return null;
+}
+
+async function edgeLoadKalshi(){
+  const q=$('edge-kalshi-q').value.trim(), btn=$('edge-kalshi-load'), st=$('edge-kalshi-status');
+  const params=new URLSearchParams(); if(q) params.set('series_ticker',q); params.set('status','open'); params.set('limit','200');
+  btn.disabled=true; const orig=btn.textContent; btn.textContent='Loading…';
+  st.style.color='var(--text3)'; st.textContent='Fetching Kalshi markets…';
+  try{
+    const res=await fetch('/api/kalshi?'+params.toString());
+    let data; try{ data=await res.json(); }catch(e){ throw new Error('Kalshi returned a non-JSON response (it may be blocking server requests).'); }
+    if(!edgeKalshiLogged){ console.log('[Edge] Kalshi raw response (first call) — inspect this shape:', data); edgeKalshiLogged=true; }
+    if(!res.ok) throw new Error((data&&(data.error||data.message))?(data.error||data.message):('Kalshi error '+res.status));
+    const markets=(data&&Array.isArray(data.markets))?data.markets:(Array.isArray(data)?data:[]);
+    if(!markets.length){ edgeKalshiMarkets=[]; $('edge-kalshi-controls').style.display='none'; st.style.color='var(--gold)'; st.textContent='No Kalshi markets for that ticker. Check the series ticker, or Kalshi may be blocking server requests — see console for the raw response.'; return; }
+    edgeKalshiMarkets=markets;
+    $('edge-kalshi-market').innerHTML=markets.map((m,i)=>{ const yp=kalshiYesProb(m); const lbl=m.yes_sub_title||m.title||m.subtitle||m.ticker||('Market '+(i+1)); const pct=yp==null?'price?':((yp*100).toFixed(0)+'% YES'); return `<option value="${i}">${String(lbl).slice(0,60)} · ${pct}</option>`; }).join('');
+    $('edge-kalshi-controls').style.display='block';
+    st.style.color='var(--dk)'; st.textContent='✓ '+markets.length+' Kalshi markets loaded (vig-free).';
+  }catch(err){
+    edgeKalshiMarkets=[]; $('edge-kalshi-controls').style.display='none';
+    st.style.color='var(--red)'; st.textContent='⚠ '+err.message;
+  }finally{ btn.disabled=false; btn.textContent=orig; }
+}
+
+function edgeFillFromKalshi(){
+  const m=edgeKalshiMarkets[+$('edge-kalshi-market').value], st=$('edge-kalshi-status'); if(!m) return;
+  const yesProb=kalshiYesProb(m);
+  if(yesProb==null){ st.style.color='var(--red)'; st.textContent='Could not read a price from that market (its shape is logged in the console).'; console.log('[Edge] Kalshi market with unreadable price:', m); return; }
+  const side=$('edge-kalshi-side').value;            // yes | no
+  const betProb = side==='yes' ? yesProb : (1-yesProb);
+  const refA=probToAmerican(betProb), refB=probToAmerican(1-betProb);
+  if(refA==null||refB==null){ st.style.color='var(--red)'; st.textContent='Price too extreme to convert to American odds.'; return; }
+  $('edge-ref-a').value=refA; $('edge-ref-b').value=refB;
+  const lbl=m.yes_sub_title||m.title||m.subtitle||m.ticker||'Kalshi market';
+  $('edge-mkt-label').value=`${String(lbl).slice(0,50)} — ${side.toUpperCase()} (Kalshi)`;
+  st.style.color='var(--dk)'; st.textContent=`✓ Vig-free reference filled: ${side.toUpperCase()} ≈ ${(betProb*100).toFixed(1)}% (${edgeSigned(refA,0)}). Now enter your book's price below and Calculate.`;
+  $('edge-soft').focus();
 }
 
 // ══════════════════════════════════════════
